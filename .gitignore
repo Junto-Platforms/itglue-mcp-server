@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+coverage/
+.claude/
+.opencode/
+CLAUDE.md

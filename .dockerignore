@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.git/
+.gitignore
+.env
+.env.*
+*.tsbuildinfo
+.claude/
+.opencode/
+CLAUDE.md
+*.test.ts
+*.test.js
+.DS_Store
