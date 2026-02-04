@@ -209,12 +209,16 @@ Error Handling:
             lines.push(
               `### ${typeLabel} Section (ID: ${section.id}, Position: ${section.sort ?? "—"})`
             );
+            if (section.level != null)
+              lines.push(`**Level**: ${section.level}`);
             if (section.content) {
               const plainText = stripHtml(section.content);
               lines.push(plainText);
             } else {
               lines.push("*No content*");
             }
+            if (section.duration != null)
+              lines.push(`- **Duration**: ${section.duration} min`);
             lines.push("");
           }
         }

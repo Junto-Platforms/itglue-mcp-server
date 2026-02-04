@@ -87,6 +87,47 @@ describe("CreateDocumentSectionSchema", () => {
     expect(result.content).toBeUndefined();
     expect(result.sort).toBeUndefined();
   });
+
+  it("accepts level for Heading sections", () => {
+    const result = CreateDocumentSectionSchema.parse({
+      document_id: 1,
+      section_type: "Heading",
+      content: "Overview",
+      level: 2,
+    });
+    expect(result.level).toBe(2);
+  });
+
+  it("rejects level outside 1-6", () => {
+    expect(() =>
+      CreateDocumentSectionSchema.parse({
+        document_id: 1,
+        section_type: "Heading",
+        content: "Bad",
+        level: 0,
+      })
+    ).toThrow();
+    expect(() =>
+      CreateDocumentSectionSchema.parse({
+        document_id: 1,
+        section_type: "Heading",
+        content: "Bad",
+        level: 7,
+      })
+    ).toThrow();
+  });
+
+  it("accepts duration and reset_count for Step sections", () => {
+    const result = CreateDocumentSectionSchema.parse({
+      document_id: 1,
+      section_type: "Step",
+      content: "<p>Do this.</p>",
+      duration: 5,
+      reset_count: true,
+    });
+    expect(result.duration).toBe(5);
+    expect(result.reset_count).toBe(true);
+  });
 });
 
 describe("UpdateDocumentSectionSchema", () => {
@@ -115,6 +156,26 @@ describe("UpdateDocumentSectionSchema", () => {
     });
     expect(result.content).toBeUndefined();
     expect(result.sort).toBeUndefined();
+  });
+
+  it("accepts level for Heading updates", () => {
+    const result = UpdateDocumentSectionSchema.parse({
+      document_id: 1,
+      section_id: 2,
+      level: 3,
+    });
+    expect(result.level).toBe(3);
+  });
+
+  it("accepts duration and reset_count for Step updates", () => {
+    const result = UpdateDocumentSectionSchema.parse({
+      document_id: 1,
+      section_id: 2,
+      duration: 10,
+      reset_count: false,
+    });
+    expect(result.duration).toBe(10);
+    expect(result.reset_count).toBe(false);
   });
 });
 

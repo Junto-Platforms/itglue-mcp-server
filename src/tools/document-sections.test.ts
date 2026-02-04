@@ -198,7 +198,7 @@ describe("registerDocumentSectionTools", () => {
       expect(body.data.attributes["resource-type"]).toBe("Document::Text");
     });
 
-    it("maps section_type 'Heading' correctly", async () => {
+    it("maps section_type 'Heading' correctly with level", async () => {
       mockClient.post.mockResolvedValue({
         id: "99",
         resource_type: "Document::Heading",
@@ -209,11 +209,15 @@ describe("registerDocumentSectionTools", () => {
       await handler()({
         document_id: 42,
         section_type: "Heading",
+        content: "Overview",
+        level: 2,
         response_format: "markdown",
       });
 
       const body = mockClient.post.mock.calls[0][1];
       expect(body.data.attributes["resource-type"]).toBe("Document::Heading");
+      expect(body.data.attributes).toHaveProperty("content", "Overview");
+      expect(body.data.attributes).toHaveProperty("level", 2);
     });
 
     it("uses 'sort' not 'position' in attributes", async () => {
@@ -254,6 +258,30 @@ describe("registerDocumentSectionTools", () => {
         "/documents/42/relationships/sections",
         expect.any(Object)
       );
+    });
+
+    it("includes duration and reset_count for Step sections", async () => {
+      mockClient.post.mockResolvedValue({
+        id: "99",
+        resource_type: "Document::Step",
+        sort: 0,
+        created_at: "2024-06-01",
+      });
+
+      await handler()({
+        document_id: 42,
+        section_type: "Step",
+        content: "<p>Do this step.</p>",
+        duration: 5,
+        reset_count: true,
+        response_format: "markdown",
+      });
+
+      const body = mockClient.post.mock.calls[0][1];
+      expect(body.data.attributes["resource-type"]).toBe("Document::Step");
+      expect(body.data.attributes).toHaveProperty("content", "<p>Do this step.</p>");
+      expect(body.data.attributes).toHaveProperty("duration", 5);
+      expect(body.data.attributes).toHaveProperty("reset-count", true);
     });
 
     it("includes content when provided", async () => {
@@ -310,6 +338,25 @@ describe("registerDocumentSectionTools", () => {
       const body = mockClient.patch.mock.calls[0][1];
       expect(body.data.attributes).toHaveProperty("content", "<p>Updated</p>");
       expect(body.data.attributes).not.toHaveProperty("sort");
+    });
+
+    it("includes level when provided", async () => {
+      mockClient.patch.mockResolvedValue({
+        id: "10",
+        resource_type: "Document::Heading",
+        sort: 0,
+        updated_at: "2024-06-01",
+      });
+
+      await handler()({
+        document_id: 42,
+        section_id: 10,
+        level: 3,
+        response_format: "markdown",
+      });
+
+      const body = mockClient.patch.mock.calls[0][1];
+      expect(body.data.attributes).toHaveProperty("level", 3);
     });
 
     it("does not include section_type in body", async () => {
