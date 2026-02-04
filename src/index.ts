@@ -13,7 +13,7 @@ import { registerOrganizationTools } from "./tools/organizations.js";
 import { registerDocumentTools } from "./tools/documents.js";
 import { registerDocumentSectionTools } from "./tools/document-sections.js";
 
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const SERVER_NAME = "itglue-mcp-server";
 
 interface CliConfig {
@@ -169,10 +169,44 @@ function createServer(config: CliConfig): McpServer {
     baseUrl: config.baseUrl,
   });
 
-  const server = new McpServer({
-    name: SERVER_NAME,
-    version: VERSION,
-  });
+  const server = new McpServer(
+    {
+      name: SERVER_NAME,
+      version: VERSION,
+    },
+    {
+      instructions: [
+        "# ITGlue MCP Server — Tool Usage Guide",
+        "",
+        "## Searching and Filtering",
+        "- Filters use EXACT matching, not fuzzy/partial matching.",
+        "- When locating a specific organization or document by name, prefer listing WITHOUT filters and scanning the results yourself rather than using a filter that may miss due to exact-match semantics.",
+        "- Filters are useful when you know the exact value (e.g., an ID or precise name).",
+        "",
+        "## Workflow: Reading Documents",
+        "1. Use itglue_list_organizations to find the organization ID.",
+        "2. Use itglue_list_documents with the org ID to find documents.",
+        "3. Use itglue_get_document to retrieve full content (may be truncated at 25k chars).",
+        "4. If content is truncated, use itglue_list_document_sections then itglue_get_document_section for individual sections.",
+        "",
+        "## Workflow: Creating Documents",
+        "1. itglue_create_document creates a DRAFT — it is not visible until published.",
+        "2. Add content with itglue_create_document_section (supports Text, Heading, Gallery, Step types).",
+        "3. Use itglue_publish_document to make it visible.",
+        "",
+        "## Workflow: Updating Documents",
+        "- itglue_update_document only changes metadata (name). To change content, use itglue_update_document_section.",
+        "- You need the section ID — get it from itglue_list_document_sections.",
+        "",
+        "## Important Notes",
+        "- All list tools support pagination (default 50, max 1000 per page).",
+        "- All read tools accept response_format: 'markdown' (default, human-readable) or 'json' (structured).",
+        "- Use json format when you need to process data programmatically.",
+        "- Delete operations are PERMANENT and cannot be undone.",
+        "- Section content uses HTML format.",
+      ].join("\n"),
+    },
+  );
 
   registerOrganizationTools(server, itglueClient);
   registerDocumentTools(server, itglueClient);
