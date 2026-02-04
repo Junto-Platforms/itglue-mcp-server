@@ -92,6 +92,9 @@ export interface ITGlueDocumentSection {
   resource_type: string | null;
   content: string | null;
   rendered_content: string | null;
+  level: number | null;
+  duration: number | null;
+  reset_count: boolean | null;
   sort: number | null;
   created_at: string;
   updated_at: string;

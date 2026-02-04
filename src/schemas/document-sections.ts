@@ -49,7 +49,22 @@ export const CreateDocumentSectionSchema = z
     content: z
       .string()
       .optional()
-      .describe("HTML content for the section"),
+      .describe("HTML content for Text and Step sections, or plain text for Heading sections"),
+    level: z
+      .number()
+      .int()
+      .min(1)
+      .max(6)
+      .optional()
+      .describe("Heading level 1-6. REQUIRED for Heading sections."),
+    duration: z
+      .number()
+      .optional()
+      .describe("Duration in minutes. Only used for Step sections."),
+    reset_count: z
+      .boolean()
+      .optional()
+      .describe("Whether to reset the step count. Only used for Step sections."),
     sort: z
       .number()
       .int()
@@ -70,6 +85,21 @@ export const UpdateDocumentSectionSchema = z
       .string()
       .optional()
       .describe("New HTML content for the section"),
+    level: z
+      .number()
+      .int()
+      .min(1)
+      .max(6)
+      .optional()
+      .describe("New heading level 1-6 (Heading sections only)"),
+    duration: z
+      .number()
+      .optional()
+      .describe("Duration in minutes (Step sections only)"),
+    reset_count: z
+      .boolean()
+      .optional()
+      .describe("Whether to reset the step count (Step sections only)"),
     sort: z
       .number()
       .int()

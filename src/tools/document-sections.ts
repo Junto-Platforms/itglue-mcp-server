@@ -34,11 +34,14 @@ function formatSectionMarkdown(section: ITGlueDocumentSection): string {
   const lines: string[] = [
     `### ${typeLabel} Section (ID: ${section.id}, Position: ${section.sort ?? "—"})`,
   ];
+  if (section.level != null) lines.push(`**Level**: ${section.level}`);
   if (section.content) {
     lines.push(stripHtml(section.content));
   } else {
     lines.push("*No content*");
   }
+  if (section.duration != null)
+    lines.push(`- **Duration**: ${section.duration} min`);
   lines.push(`- **Updated**: ${section.updated_at}`);
   lines.push("");
   return lines.join("\n");
@@ -190,9 +193,11 @@ Error Handling:
           "",
           `**Document ID**: ${section.document_id ?? "—"}`,
           `**Position**: ${section.sort ?? "—"}`,
-          `**Updated**: ${section.updated_at}`,
-          "",
         ];
+        if (section.level != null) lines.push(`**Level**: ${section.level}`);
+        if (section.duration != null)
+          lines.push(`**Duration**: ${section.duration} min`);
+        lines.push(`**Updated**: ${section.updated_at}`, "");
 
         if (section.content) {
           lines.push("## Content", "", stripHtml(section.content), "");
@@ -217,12 +222,21 @@ Error Handling:
       title: "Create ITGlue Document Section",
       description: `Add a new section to an existing document.
 
-Section types: Text (body content), Heading (section header), Gallery (images), Step (procedural step). Content should be provided as HTML.
+Section types and their attributes:
+  - Text: content (HTML body)
+  - Heading: content (heading text), level (1-6, REQUIRED)
+  - Gallery: no additional attributes
+  - Step: content (HTML body), duration (minutes, optional), reset_count (boolean, optional)
+
+Note: rendered_content is READ-ONLY and auto-generated. Do not include it.
 
 Args:
   - document_id (number, required): Parent document ID
   - section_type ("Text"|"Heading"|"Gallery"|"Step", required): The type of section
-  - content (string, optional): HTML content for the section
+  - content (string, optional): HTML content for Text/Step sections, or plain heading text for Heading sections
+  - level (number 1-6, optional): Heading level. REQUIRED for Heading sections.
+  - duration (number, optional): Duration in minutes. Step sections only.
+  - reset_count (boolean, optional): Reset step count. Step sections only.
   - sort (number, optional): Sort order/position within the document (0-indexed)
   - response_format ("markdown"|"json", default "markdown"): Output format
 
@@ -230,11 +244,12 @@ Returns:
   The newly created section with its assigned ID.
 
 Examples:
-  - "Add a heading to document 456" -> { document_id: 456, section_type: "Heading", content: "<h2>Overview</h2>" }
+  - "Add a heading to document 456" -> { document_id: 456, section_type: "Heading", content: "Overview", level: 2 }
   - "Add body text" -> { document_id: 456, section_type: "Text", content: "<p>Server details...</p>" }
+  - "Add a step" -> { document_id: 456, section_type: "Step", content: "<p>Install the app.</p>", duration: 5 }
 
 Error Handling:
-  - Returns "Error: Validation failed..." if required fields are missing
+  - Returns "Error: Validation failed..." if required fields are missing (e.g., level for Heading sections)
   - Returns "Error: Resource not found..." if the document doesn't exist`,
       inputSchema: CreateDocumentSectionSchema,
       annotations: {
@@ -250,6 +265,10 @@ Error Handling:
           resource_type: `Document::${params.section_type}`,
         };
         if (params.content !== undefined) attributes.content = params.content;
+        if (params.level !== undefined) attributes.level = params.level;
+        if (params.duration !== undefined) attributes.duration = params.duration;
+        if (params.reset_count !== undefined)
+          attributes.reset_count = params.reset_count;
         if (params.sort !== undefined) attributes.sort = params.sort;
 
         const body = serializeRequest("document-sections", attributes);
@@ -297,12 +316,15 @@ Error Handling:
       title: "Update ITGlue Document Section",
       description: `Update an existing document section's content or sort order.
 
-Content should be provided as HTML. Only specified fields are updated; omitted fields remain unchanged. The section type (resource_type) cannot be changed after creation.
+Content should be provided as HTML. Only specified fields are updated; omitted fields remain unchanged. The section type (resource_type) cannot be changed after creation. rendered_content is READ-ONLY and auto-generated — do not include it.
 
 Args:
   - document_id (number, required): The parent document ID
   - section_id (number, required): The section ID to update
-  - content (string, optional): New HTML content
+  - content (string, optional): New HTML content (or heading text for Heading sections)
+  - level (number 1-6, optional): New heading level (Heading sections only)
+  - duration (number, optional): Duration in minutes (Step sections only)
+  - reset_count (boolean, optional): Reset step count (Step sections only)
   - sort (number, optional): New sort order/position within the document
   - response_format ("markdown"|"json", default "markdown"): Output format
 
@@ -327,6 +349,10 @@ Error Handling:
       try {
         const attributes: Record<string, unknown> = {};
         if (params.content !== undefined) attributes.content = params.content;
+        if (params.level !== undefined) attributes.level = params.level;
+        if (params.duration !== undefined) attributes.duration = params.duration;
+        if (params.reset_count !== undefined)
+          attributes.reset_count = params.reset_count;
         if (params.sort !== undefined) attributes.sort = params.sort;
 
         const body = serializeRequest(

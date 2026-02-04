@@ -1,6 +1,6 @@
 {
   "name": "itglue-mcp-server",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Unofficial MCP server for the ITGlue API — manage documents, sections, and organizations via the Model Context Protocol",
   "type": "module",
   "main": "dist/index.js",
