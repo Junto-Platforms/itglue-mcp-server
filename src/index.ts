@@ -13,7 +13,7 @@ import { registerOrganizationTools } from "./tools/organizations.js";
 import { registerDocumentTools } from "./tools/documents.js";
 import { registerDocumentSectionTools } from "./tools/document-sections.js";
 
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const SERVER_NAME = "itglue-mcp-server";
 
 interface CliConfig {
