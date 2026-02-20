@@ -185,7 +185,7 @@ function createServer(config: CliConfig): McpServer {
         "",
         "## Workflow: Reading Documents",
         "1. Use itglue_list_organizations to find the organization ID.",
-        "2. Use itglue_list_documents with the org ID to find documents.",
+        "2. Use itglue_list_documents with the org ID to find documents (includes documents in folders).",
         "3. Use itglue_get_document to retrieve full content (may be truncated at 25k chars).",
         "4. If content is truncated, use itglue_list_document_sections then itglue_get_document_section for individual sections.",
         "",
