@@ -36,15 +36,17 @@ describe("registerDocumentTools", () => {
   describe("itglue_list_documents", () => {
     const handler = () => handlers["itglue_list_documents"];
 
-    it("uses org-scoped path", async () => {
-      mockClient.getMany.mockResolvedValue({
-        data: [],
-        total_count: 0,
-        page_number: 1,
-        page_size: 50,
-        has_more: false,
-        next_page: null,
-      });
+    const emptyResult = {
+      data: [],
+      total_count: 0,
+      page_number: 1,
+      page_size: 50,
+      has_more: false,
+      next_page: null,
+    };
+
+    it("makes two getMany calls for root and folder documents", async () => {
+      mockClient.getMany.mockResolvedValue(emptyResult);
 
       await handler()({
         organization_id: 123,
@@ -53,20 +55,61 @@ describe("registerDocumentTools", () => {
         response_format: "markdown",
       });
 
-      expect(mockClient.getMany).toHaveBeenCalledWith(
-        "/organizations/123/relationships/documents",
-        expect.any(Object)
+      expect(mockClient.getMany).toHaveBeenCalledTimes(2);
+    });
+
+    it("uses org-scoped path for both calls", async () => {
+      mockClient.getMany.mockResolvedValue(emptyResult);
+
+      await handler()({
+        organization_id: 123,
+        page_number: 1,
+        page_size: 50,
+        response_format: "markdown",
+      });
+
+      const expectedPath = "/organizations/123/relationships/documents";
+      expect(mockClient.getMany.mock.calls[0][0]).toBe(expectedPath);
+      expect(mockClient.getMany.mock.calls[1][0]).toBe(expectedPath);
+    });
+
+    it("first call does not include folder filter", async () => {
+      mockClient.getMany.mockResolvedValue(emptyResult);
+
+      await handler()({
+        organization_id: 123,
+        page_number: 1,
+        page_size: 50,
+        response_format: "markdown",
+      });
+
+      const firstCallParams = mockClient.getMany.mock.calls[0][1];
+      expect(firstCallParams).not.toHaveProperty(
+        "filter[document-folder-id][ne]"
       );
     });
 
-    it("passes filter and pagination params", async () => {
-      mockClient.getMany.mockResolvedValue({
-        data: [],
-        total_count: 0,
+    it("second call includes folder filter param", async () => {
+      mockClient.getMany.mockResolvedValue(emptyResult);
+
+      await handler()({
+        organization_id: 123,
         page_number: 1,
+        page_size: 50,
+        response_format: "markdown",
+      });
+
+      const secondCallParams = mockClient.getMany.mock.calls[1][1];
+      expect(secondCallParams).toHaveProperty(
+        "filter[document-folder-id][ne]",
+        "null"
+      );
+    });
+
+    it("passes filter and pagination params to both calls", async () => {
+      mockClient.getMany.mockResolvedValue({
+        ...emptyResult,
         page_size: 25,
-        has_more: false,
-        next_page: null,
       });
 
       await handler()({
@@ -79,25 +122,105 @@ describe("registerDocumentTools", () => {
         response_format: "markdown",
       });
 
-      const params = mockClient.getMany.mock.calls[0][1];
-      expect(params).toMatchObject({
+      const expectedBase = {
         "page[number]": 2,
         "page[size]": 25,
         "filter[name]": "runbook",
         "filter[id]": 5,
         sort: "-updated_at",
-      });
+      };
+
+      expect(mockClient.getMany.mock.calls[0][1]).toMatchObject(expectedBase);
+      expect(mockClient.getMany.mock.calls[1][1]).toMatchObject(expectedBase);
     });
 
-    it("returns empty results message", async () => {
-      mockClient.getMany.mockResolvedValue({
-        data: [],
-        total_count: 0,
+    it("combines results from both calls", async () => {
+      mockClient.getMany
+        .mockResolvedValueOnce({
+          ...emptyResult,
+          data: [
+            { id: "1", name: "RootDoc", published: true, updated_at: "2024-01-01" },
+          ],
+          total_count: 1,
+        })
+        .mockResolvedValueOnce({
+          ...emptyResult,
+          data: [
+            { id: "2", name: "FolderDoc", published: true, updated_at: "2024-01-01" },
+          ],
+          total_count: 1,
+        });
+
+      const result = await handler()({
+        organization_id: 123,
         page_number: 1,
         page_size: 50,
-        has_more: false,
-        next_page: null,
+        response_format: "markdown",
       });
+
+      const text = result.content[0].text;
+      expect(text).toContain("RootDoc");
+      expect(text).toContain("FolderDoc");
+      expect(text).toContain("2 total");
+    });
+
+    it("deduplicates documents by id", async () => {
+      mockClient.getMany
+        .mockResolvedValueOnce({
+          ...emptyResult,
+          data: [{ id: "1", name: "SharedDoc" }],
+          total_count: 1,
+        })
+        .mockResolvedValueOnce({
+          ...emptyResult,
+          data: [{ id: "1", name: "SharedDoc" }],
+          total_count: 1,
+        });
+
+      const result = await handler()({
+        organization_id: 123,
+        page_number: 1,
+        page_size: 50,
+        response_format: "json",
+      });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.data).toHaveLength(1);
+    });
+
+    it("reports has_more if either call has more", async () => {
+      mockClient.getMany
+        .mockResolvedValueOnce({
+          data: [{ id: "1", name: "Doc1" }],
+          total_count: 100,
+          page_number: 1,
+          page_size: 50,
+          has_more: true,
+          next_page: 2,
+        })
+        .mockResolvedValueOnce({
+          data: [{ id: "2", name: "Doc2" }],
+          total_count: 5,
+          page_number: 1,
+          page_size: 50,
+          has_more: false,
+          next_page: null,
+        });
+
+      const result = await handler()({
+        organization_id: 123,
+        page_number: 1,
+        page_size: 50,
+        response_format: "json",
+      });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.has_more).toBe(true);
+      expect(parsed.total_count).toBe(105);
+    });
+
+    it("returns empty results message when both calls return no data", async () => {
+      mockClient.getMany.mockResolvedValue(emptyResult);
 
       const result = await handler()({
         organization_id: 123,
@@ -109,14 +232,11 @@ describe("registerDocumentTools", () => {
       expect(result.content[0].text).toContain("No documents found");
     });
 
-    it("returns JSON format", async () => {
+    it("returns JSON format with combined data", async () => {
       mockClient.getMany.mockResolvedValue({
+        ...emptyResult,
         data: [{ id: "1", name: "Doc1" }],
         total_count: 1,
-        page_number: 1,
-        page_size: 50,
-        has_more: false,
-        next_page: null,
       });
 
       const result = await handler()({

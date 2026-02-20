@@ -47,9 +47,11 @@ export function registerDocumentTools(
     "itglue_list_documents",
     {
       title: "List ITGlue Documents",
-      description: `List and search documents within a specific organization.
+      description: `List and search documents within a specific organization, including documents inside folders.
 
 Returns document metadata including name, organization, published status, and timestamps. Does NOT return document content — use itglue_get_document for full content. Use itglue_list_organizations first if you need to find the organization ID.
+
+Internally makes two API calls to retrieve both root-level and folder-nested documents, then merges the results. Pagination params apply to each call separately, so up to 2x page_size results may be returned.
 
 Args:
   - organization_id (number, required): Organization ID to list documents for
@@ -81,20 +83,47 @@ Error Handling:
     },
     async (params: ListDocumentsInput) => {
       try {
-        const queryParams: Record<string, string | number> = {
+        const path = `/organizations/${params.organization_id}/relationships/documents`;
+
+        const baseQueryParams: Record<string, string | number> = {
           ...buildPaginationParams(params.page_number, params.page_size),
           ...buildFilterParams({
             name: params.filter_name,
             id: params.filter_id,
           }),
         };
-        if (params.sort) queryParams.sort = params.sort;
+        if (params.sort) baseQueryParams.sort = params.sort;
 
-        const path = `/organizations/${params.organization_id}/relationships/documents`;
+        // Call 1: Root-level documents (default API behavior)
+        const rootResult = await client.getMany<ITGlueDocument>(
+          path,
+          baseQueryParams
+        );
 
-        const result = await client.getMany<ITGlueDocument>(path, queryParams);
+        // Call 2: Documents inside folders
+        const folderQueryParams: Record<string, string | number> = {
+          ...baseQueryParams,
+          "filter[document-folder-id][ne]": "null",
+        };
+        const folderResult = await client.getMany<ITGlueDocument>(
+          path,
+          folderQueryParams
+        );
 
-        if (result.data.length === 0) {
+        // Merge and deduplicate by document ID
+        const seen = new Set<string>();
+        const allData: ITGlueDocument[] = [];
+        for (const doc of [...rootResult.data, ...folderResult.data]) {
+          if (!seen.has(doc.id)) {
+            seen.add(doc.id);
+            allData.push(doc);
+          }
+        }
+
+        const totalCount = rootResult.total_count + folderResult.total_count;
+        const hasMore = rootResult.has_more || folderResult.has_more;
+
+        if (allData.length === 0) {
           return {
             content: [
               {
@@ -106,25 +135,29 @@ Error Handling:
         }
 
         if (params.response_format === ResponseFormat.JSON) {
-          const text = JSON.stringify(result, null, 2);
+          const jsonResult = {
+            data: allData,
+            total_count: totalCount,
+            page_number: params.page_number,
+            page_size: params.page_size,
+            has_more: hasMore,
+            next_page: hasMore ? params.page_number + 1 : null,
+          };
+          const text = JSON.stringify(jsonResult, null, 2);
           return {
             content: [{ type: "text" as const, text: truncateIfNeeded(text) }],
           };
         }
 
         const lines: string[] = [
-          `# Documents (${result.total_count} total)`,
+          `# Documents (${totalCount} total)`,
           "",
         ];
-        for (const doc of result.data) {
+        for (const doc of allData) {
           lines.push(formatDocumentMarkdown(doc));
         }
         lines.push(
-          paginationFooter(
-            result.total_count,
-            result.page_number,
-            result.has_more
-          )
+          paginationFooter(totalCount, params.page_number, hasMore)
         );
 
         const text = truncateIfNeeded(lines.join("\n"));
